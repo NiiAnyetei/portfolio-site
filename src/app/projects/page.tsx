@@ -3,47 +3,48 @@ import Image from 'next/image'
 
 import { Card } from '@/components/Card'
 import { SimpleLayout } from '@/components/SimpleLayout'
-import logoAnimaginary from '@/images/logos/animaginary.svg'
-import logoCosmos from '@/images/logos/cosmos.svg'
-import logoHelioStream from '@/images/logos/helio-stream.svg'
-import logoOpenShuttle from '@/images/logos/open-shuttle.svg'
-import logoPlanetaria from '@/images/logos/planetaria.svg'
+import logoIMS from '@/images/logos/ims.ico'
+import logoTrybz from '@/images/logos/trybz.png'
+import logoLegalConnect from '@/images/logos/legalconnect.ico'
+import logoMchudo from '@/images/logos/mchudo.jpg'
+import logoSurfwisely from '@/images/logos/surfwisely.png'
 
 const projects = [
   {
-    name: 'Planetaria',
-    description:
-      'Creating technology to empower civilians to explore space on their own terms.',
-    link: { href: 'http://planetaria.tech', label: 'planetaria.tech' },
-    logo: logoPlanetaria,
+    name: 'IMS',
+    description: 'An Installment Management System for streamlined management.',
+    link: {
+      href: 'https://github.com/NiiAnyetei/InstallmentManagementSystem',
+      label: 'github.com',
+    },
+    logo: logoIMS,
   },
   {
-    name: 'Animaginary',
-    description:
-      'High performance web animation library, hand-written in optimized WASM.',
-    link: { href: '#', label: 'github.com' },
-    logo: logoAnimaginary,
+    name: 'Trybz',
+    description: 'A platform for closed residential communities.\n\n',
+    link: { href: '	https://mytrybz.com', label: 'mytrybz.com' },
+    logo: logoTrybz,
   },
   {
-    name: 'HelioStream',
-    description:
-      'Real-time video streaming library, optimized for interstellar transmission.',
-    link: { href: '#', label: 'github.com' },
-    logo: logoHelioStream,
+    name: 'Legal Connect',
+    description: 'A platform connecting clients with legal professionals.',
+    link: {
+      href: 'https://legalconnectonline.com',
+      label: 'legalconnectonline.com',
+    },
+    logo: logoLegalConnect,
   },
   {
-    name: 'cosmOS',
-    description:
-      'The operating system that powers our Planetaria space shuttles.',
-    link: { href: '#', label: 'github.com' },
-    logo: logoCosmos,
+    name: 'M-Chudo',
+    description: 'A fintech app for streamlined financial transactions.',
+    link: { href: 'https://www.instagram.com/mchudo.ke', label: 'mchudo.ke' },
+    logo: logoMchudo,
   },
   {
-    name: 'OpenShuttle',
-    description:
-      'The schematics for the first rocket I designed that successfully made it to orbit.',
-    link: { href: '#', label: 'github.com' },
-    logo: logoOpenShuttle,
+    name: 'Surfwisely',
+    description: 'A gamified cybersecurity education platform.\n\n',
+    link: { href: 'https://surfwisely.com', label: 'surfwisely.com' },
+    logo: logoSurfwisely,
   },
 ]
 
@@ -67,7 +68,7 @@ export default function Projects() {
   return (
     <SimpleLayout
       title="Things I’ve made trying to put my dent in the universe."
-      intro="I’ve worked on tons of little projects over the years but these are the ones that I’m most proud of. Many of them are open-source, so if you see something that piques your interest, check out the code and contribute if you have ideas for how it can be improved."
+      intro="I’ve worked on tons of projects over the years but these are the ones that I’m most proud of. Some of them are open-source, so if you see something that piques your interest, check out the code and contribute if you have ideas for how it can be improved."
     >
       <ul
         role="list"

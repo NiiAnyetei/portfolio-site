@@ -5,14 +5,14 @@ import { Layout } from '@/components/Layout'
 
 import '@/styles/tailwind.css'
 
+let yearsOfExperience = new Date().getFullYear() - 2020
+
 export const metadata: Metadata = {
   title: {
-    template: '%s - Spencer Sharp',
-    default:
-      'Spencer Sharp - Software designer, founder, and amateur astronaut',
+    template: '%s - Clifford Anang',
+    default: 'Clifford Anang - Full Stack Engineer, and builder.',
   },
-  description:
-    'I’m Spencer, a software designer and entrepreneur based in New York City. I’m the founder and CEO of Planetaria, where we develop technologies that empower regular people to explore space on their own terms.',
+  description: `I’m Clifford, a Full Stack Engineer with ${yearsOfExperience} years of experience. I enjoy building both front-end and backend applications.`,
   alternates: {
     types: {
       'application/rss+xml': `${process.env.NEXT_PUBLIC_SITE_URL}/feed.xml`,

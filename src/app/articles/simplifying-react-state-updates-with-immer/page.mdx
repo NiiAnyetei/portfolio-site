@@ -1,0 +1,176 @@
+import { ArticleLayout } from '@/components/ArticleLayout'
+
+export const article = {
+  author: 'Clifford Anang',
+  date: '2025-06-17',
+  title: 'Simplifying React State Updates with Immer',
+  description:
+    'Learn how to simplify complex state updates in React using the powerful Immer library.',
+}
+
+export const metadata = {
+  title: article.title,
+  description: article.description,
+}
+
+export default (props) => <ArticleLayout article={article} {...props} />
+
+Updating state in React, especially when dealing with deeply nested structures, can become verbose and error-prone. [**Immer**](https://immerjs.github.io/immer/) — a small, powerful library that makes working with immutable data much simpler.
+
+Immer lets you write "mutative" logic while preserving immutability under the hood. In this article, we’ll explore how to use Immer to streamline state management in your React components.
+
+## Why Is Immutable State Important?
+
+React’s rendering behavior relies on detecting changes in state. Immutable updates ensure that React can correctly detect when a component needs to re-render. However, manual immutable updates — especially with nested objects — can be tedious.
+
+For example, consider this plain React state update:
+
+```jsx
+// Without Immer
+const [state, setState] = useState({
+  user: {
+    name: 'John',
+    address: {
+      city: 'Accra',
+      zip: '00233',
+    },
+  },
+})
+
+// To update the city
+setState((prev) => ({
+  ...prev,
+  user: {
+    ...prev.user,
+    address: {
+      ...prev.user.address,
+      city: 'Kumasi',
+    },
+  },
+}))
+```
+
+## Introducing Immer
+
+Immer allows you to write code like this:
+
+```jsx
+import { useState } from 'react'
+import { produce } from 'immer'
+
+const [state, setState] = useState({
+  user: {
+    name: 'John',
+    address: {
+      city: 'Accra',
+      zip: '00233',
+    },
+  },
+})
+
+const updateCity = () => {
+  setState(
+    produce((draft) => {
+      draft.user.address.city = 'Kumasi'
+    }),
+  )
+}
+```
+
+With `produce`, you receive a **draft** of the current state. You can then safely "mutate" the draft, and Immer ensures the original state remains untouched.
+
+## Setting Up Immer
+
+To get started with Immer, install it via npm:
+
+```bash
+npm install immer
+```
+
+Or with yarn:
+
+```bash
+yarn add immer
+```
+
+## Real-World Example: Todo App
+
+Let’s say we have a list of todos and want to toggle a task's completion status.
+
+```jsx
+const [todos, setTodos] = useState([
+  { id: 1, title: 'Learn React', done: false },
+  { id: 2, title: 'Use Immer', done: false },
+])
+
+const toggleTodo = (id) => {
+  setTodos(
+    produce((draft) => {
+      const todo = draft.find((t) => t.id === id)
+      if (todo) {
+        todo.done = !todo.done
+      }
+    }),
+  )
+}
+```
+
+This is clean, easy to follow, and avoids deeply nested spreads.
+
+## Using Immer with useReducer
+
+Immer also works beautifully with `useReducer`:
+
+```jsx
+import { useReducer } from 'react'
+import produce from 'immer'
+
+const initialState = { count: 0 }
+
+const reducer = produce((draft, action) => {
+  switch (action.type) {
+    case 'increment':
+      draft.count++
+      break
+    case 'decrement':
+      draft.count--
+      break
+  }
+})
+
+const Counter = () => {
+  const [state, dispatch] = useReducer(reducer, initialState)
+
+  return (
+    <>
+      <p>Count: {state.count}</p>
+      <button onClick={() => dispatch({ type: 'increment' })}>+</button>
+      <button onClick={() => dispatch({ type: 'decrement' })}>-</button>
+    </>
+  )
+}
+```
+
+## When to Use Immer
+
+✅ Use Immer when:
+
+- You have deeply nested state.
+- You're building complex forms or data structures.
+- You want cleaner, easier-to-maintain code.
+
+🚫 Avoid it if:
+
+- You prefer to stick to minimal dependencies.
+- Your state updates are already simple and flat.
+
+## Conclusion
+
+Immer is a great tool to simplify state management in React. It keeps your code clean and readable, especially as your app’s state complexity grows.
+
+By using Immer, you maintain immutability while writing code that feels natural and imperative.
+
+---
+
+**Next Steps:**  
+Explore the [Immer API docs](https://immerjs.github.io/immer/) and try integrating it in one of your existing React components to see the awesomeness for yourself!

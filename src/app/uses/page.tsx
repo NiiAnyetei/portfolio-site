@@ -46,7 +46,7 @@ export default function Uses() {
       intro="I get asked a lot about the things I use to build software, stay productive, or buy to fool myself into thinking I’m being productive when I’m really just procrastinating. Here’s a big list of all of my favorite stuff."
     >
       <div className="space-y-20">
-        <ToolsSection title="Workstation">
+        {/* <ToolsSection title="Workstation">
           <Tool title="16” MacBook Pro, M1 Max, 64GB RAM (2021)">
             I was using an Intel-based 16” MacBook Pro prior to this and the
             difference is night and day. I’ve never heard the fans turn on a
@@ -72,49 +72,52 @@ export default function Uses() {
             If I’m going to slouch in the worst ergonomic position imaginable
             all day, I might as well do it in an expensive chair.
           </Tool>
-        </ToolsSection>
+        </ToolsSection> */}
         <ToolsSection title="Development tools">
-          <Tool title="Sublime Text 4">
-            I don’t care if it’s missing all of the fancy IDE features everyone
-            else relies on, Sublime Text is still the best text editor ever
-            made.
+          <Tool title="Visual Studio">
+            When I need full-scale enterprise tools, Visual Studio delivers
+            everything from powerful debugging to seamless Azure integration.
           </Tool>
-          <Tool title="iTerm2">
-            I’m honestly not even sure what features I get with this that aren’t
-            just part of the macOS Terminal but it’s what I use.
+          <Tool title="Visual Studio Code">
+            I don’t care if it’s missing all the bells and whistles of
+            heavyweight IDEs—Visual Studio Code remains my go-to editor for
+            speed, flexibility, and extensibility.
           </Tool>
-          <Tool title="TablePlus">
-            Great software for working with databases. Has saved me from
-            building about a thousand admin interfaces for my various projects
-            over the years.
+          <Tool title="SQL Server Management Studio">
+            For database work, I switch to SQL Server Management Studio for its
+            comprehensive control.
+          </Tool>
+          <Tool title="Azure Data Studio">
+            I switch to Azure Data Studio for a more modern, developer-friendly
+            experience.
+          </Tool>
+          <Tool title="NGROK">
+            When it’s time to demo or test webhooks, NGROK makes exposing local
+            servers to the internet seemless.
           </Tool>
         </ToolsSection>
         <ToolsSection title="Design">
           <Tool title="Figma">
-            We started using Figma as just a design tool but now it’s become our
-            virtual whiteboard for the entire company. Never would have expected
-            the collaboration features to be the real hook.
+            Figma is hands-down the best tool for modern interface design and
+            collaboration. Figma helps bring ideas to life faster, without ever
+            needing to leave the browser.
           </Tool>
         </ToolsSection>
         <ToolsSection title="Productivity">
-          <Tool title="Alfred">
-            It’s not the newest kid on the block but it’s still the fastest. The
-            Sublime Text of the application launcher world.
+          <Tool title="Microsoft To Do">
+            Microsoft To Do keeps me focused better than any complex
+            productivity suite ever could. With its clean interface, smart daily
+            planning (“My Day”), and deep integration with Outlook and Microsoft
+            365, it helps me stay on top of personal and project tasks without
+            the clutter. Sometimes, less really is more.
           </Tool>
-          <Tool title="Reflect">
-            Using a daily notes system instead of trying to keep things
-            organized by topics has been super powerful for me. And with
-            Reflect, it’s still easy for me to keep all of that stuff
-            discoverable by topic even though all of my writing happens in the
-            daily note.
-          </Tool>
-          <Tool title="SavvyCal">
-            Great tool for scheduling meetings while protecting my calendar and
-            making sure I still have lots of time for deep work during the week.
-          </Tool>
-          <Tool title="Focus">
-            Simple tool for blocking distracting websites when I need to just do
-            the work and get some momentum going.
+          <Tool title="Azure DevOps">
+            Azure DevOps delivers the end-to-end workflow that actually gets
+            things shipped. From code repos and CI/CD pipelines to project
+            boards and test plans, it brings everything together in one tightly
+            integrated platform. Whether I’m tracking user stories or automating
+            deployments, Azure DevOps keeps the entire software lifecycle moving
+            with precision.
           </Tool>
         </ToolsSection>
       </div>
