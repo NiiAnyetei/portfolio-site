@@ -4,6 +4,7 @@ import { Providers } from '@/app/providers'
 import { Layout } from '@/components/Layout'
 
 import '@/styles/tailwind.css'
+import { GoogleAnalytics } from '@next/third-parties/google'
 
 let yearsOfExperience = new Date().getFullYear() - 2020
 
@@ -34,6 +35,7 @@ export default function RootLayout({
           </div>
         </Providers>
       </body>
+      <GoogleAnalytics gaId="G-7J4D8TZ2J0" />
     </html>
   )
 }
