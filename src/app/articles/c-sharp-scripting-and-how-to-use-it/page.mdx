@@ -1,0 +1,174 @@
+import { ArticleLayout } from '@/components/ArticleLayout'
+import cSharpScripting from './c-sharp-scripting.png'
+
+export const article = {
+  author: 'Clifford Anang',
+  date: '2025-06-27',
+  title:
+    'Getting Started with C# Scripting: A Practical Guide to Automation and Lightweight Development',
+  description:
+    'Learn how to use C# scripting to automate processes with a use-case of renaming and organizing files into dated folders.',
+}
+
+export const metadata = {
+  title: article.title,
+  description: article.description,
+}
+
+export default (props) => <ArticleLayout article={article} {...props} />
+
+<Image src={cSharpScripting} alt="" />
+
+## What is C# Scripting?
+
+C# scripting is a lightweight way to write and run C# code without needing to create a full project in Visual Studio. It’s useful for automation, prototyping, interactive development, and even embedding logic in other environments like Unity or web tools.
+
+## How to Get Started (Quick CLI Setup)
+
+1. Install .NET SDK (if not installed)  
+   [https://dotnet.microsoft.com/en-us/download](https://dotnet.microsoft.com/en-us/download)
+
+2. Install dotnet-script  
+   `dotnet tool install -g dotnet-script`
+
+3. Create a C# Script File
+
+   ```csharp
+   // hello.csx
+   Console.WriteLine("Hello from C# Script!");
+   ```
+
+4. Run It  
+   `dotnet script hello.csx`  
+   You’ll see:
+   ```csharp
+   Hello from C# Script!
+   ```
+
+## What Can You Do with C# Scripting?
+
+- Try snippets quickly
+
+  ```csharp
+  var now = DateTime.Now.ToString("h:mm:ss tt");
+  Console.WriteLine($"The time is {now}");
+  ```
+
+- Reference packages
+
+  ```csharp
+  #r "nuget: Newtonsoft.Json, 13.0.3"
+
+  using Newtonsoft.Json;
+
+  var obj = new { name = "John", age = 30 };
+  Console.WriteLine(JsonConvert.SerializeObject(obj));
+  ```
+
+- Automate tasks  
+  Script small jobs like:
+  - Processing CSV files
+  - Web scraping
+  - Sending emails
+  - File system automation
+
+## Use Case: Renaming and Organizing Files in a Folder
+
+Imagine you receive dozens of image or document files daily (e.g., invoices, receipts, etc.), and you want a script that:
+
+- Renames each file using a timestamp format
+- Moves it to a dated subfolder like `./organized/2025-06-24/`
+
+## C# Script: organize_files.csx
+
+Create a new file named `organize_files.csx` in your project folder.
+
+```csharp
+#r "System.IO"
+
+using System;
+using System.IO;
+
+// Input directory
+var inputDir = "./incoming";
+
+// Output directory base
+var outputBaseDir = "./organized";
+
+// Create today's dated folder
+var todayFolder = Path.Combine(outputBaseDir, DateTime.Now.ToString("yyyy-MM-dd"));
+Directory.CreateDirectory(todayFolder);
+
+Console.WriteLine($"Organizing files from {inputDir} to {todayFolder}...");
+
+// Process each file
+foreach (var file in Directory.GetFiles(inputDir))
+{
+    var ext = Path.GetExtension(file);
+    var newFileName = $"file-{DateTime.Now:yyyyMMdd-HHmmssfff}{ext}";
+    var destination = Path.Combine(todayFolder, newFileName);
+
+    File.Move(file, destination);
+    Console.WriteLine($"Moved: {file} ➜ {destination}");
+}
+```
+
+## Folder Setup
+
+Before running the script, create these folders:
+
+```lua
+/incoming      --> Drop your raw files here
+/organized     --> The script will auto-create subfolders like /2025-06-24
+```
+
+## Running the Script
+
+Run the script using the dotnet-script CLI:
+
+```bash
+dotnet script organize_files.csx
+```
+
+You should see the log output for each file processed and moved.
+
+## What the Script Does
+
+- Scans all files in /incoming
+- Creates a folder named after today’s date
+- Renames each file using a precise timestamp (e.g., file-20250624-145500123.jpg)
+- Moves the file into the appropriate organized/YYYY-MM-DD folder
+
+## Customization Ideas
+
+You can extend the script to:
+
+- Rename files by prefix (e.g., invoice-..., receipt-...)
+- Only process certain file types (e.g., .pdf, .jpg)
+- Send a daily summary email
+- Schedule this script using Windows Task Scheduler or cron
+
+## Benefits of C# Scripting
+
+- No project files or boilerplate
+- Works cross-platform (Windows, macOS, Linux)
+- Ideal for automation, prototyping, and DevOps tasks
+- Easy to maintain and version-control like any other code
+
+## Conclusion
+
+Without the burden of a complete project setup, C# scripting is a strong yet portable tool for handling repetitive file operations, automating tasks, and testing concepts.
+
+The wider potential of scripting in your everyday workflow can be unlocked by beginning with a straightforward use case, such as file organisation. The options increase from this point on: data transformations, report generation, scheduled jobs, and even API integration.
+
+C# scripting is, therefore, a great place to start if you want to increase productivity, decrease manual labour, or simply discover a new way to use C#.
+
+---
+
+**Next Steps:**
+
+Want to automate more?
+
+- Turn this into a scheduled job
+- Add logging to a .txt file
+- Trigger a webhook or send an email after organizing
