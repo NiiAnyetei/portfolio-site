@@ -1,0 +1,410 @@
+import { ArticleLayout } from '@/components/ArticleLayout'
+import dotNetCSharpTwo from './dot-net-c-sharp-two.png'
+
+export const article = {
+  author: 'Clifford Anang',
+  date: '2026-01-22',
+  title: '.NET 10 & C# 14 Deep Dive Series - PART 2',
+  description:
+    'Null-Conditional Assignment - Stop Writing if (x != null) Everywhere',
+}
+
+export const metadata = {
+  title: article.title,
+  description: article.description,
+}
+
+export default (props) => <ArticleLayout article={article} {...props} />
+
+<Image src={dotNetCSharpTwo} alt="" />
+
+## Part 2: Null-Conditional Assignment - Stop Writing `if (x != null)` Everywhere
+
+_Reading time: 5 minutes_
+
+Welcome back! In [Part 1](dot-net-10-c-sharp-14-p1), we explored how the `field` keyword eliminates property boilerplate. Today, we're tackling another everyday frustration: assigning values to potentially null objects.
+
+Spoiler: C# 14 makes it ridiculously clean.
+
+---
+
+## The Null Check Dance
+
+You know this pattern. You've written it a thousand times:
+
+```csharp
+if (customer != null)
+{
+    customer.Order = GetCurrentOrder();
+}
+```
+
+Or maybe you prefer the slightly shorter version:
+
+```csharp
+if (customer is not null)
+    customer.Order = GetCurrentOrder();
+```
+
+It works. It's safe. It's also **verbose** and **error-prone** when you forget that one check in a 500-line method.
+
+Now imagine doing this with nested objects:
+
+```csharp
+if (company != null)
+{
+    if (company.Department != null)
+    {
+        if (company.Department.Manager != null)
+        {
+            company.Department.Manager.Assistant = newAssistant;
+        }
+    }
+}
+```
+
+This is what developers call "the pyramid of doom." Three levels deep and we've lost 80 characters of horizontal space to whitespace.
+
+---
+
+## C# Already Had a Solution... Sort Of
+
+C# 6 introduced the **null-conditional operator** (`?.`) for _reading_ values safely:
+
+```csharp
+// This won't crash if customer is null
+var orderDate = customer?.Order?.OrderDate;
+```
+
+Beautiful, right? One line. No if statements. No crashes.
+
+But here's the catch: **It only worked for reading values, not writing them.**
+
+You couldn't do this:
+
+```csharp
+customer?.Order = GetCurrentOrder(); // ❌ Compiler error in C# 13
+```
+
+---
+
+## C# 14: The Missing Piece
+
+C# 14 extends the null-conditional operator to work on the **left side of assignments**. Now you can write:
+
+```csharp
+customer?.Order = GetCurrentOrder(); // ✅ Works in C# 14!
+```
+
+That's it. If `customer` is null, nothing happens. If `customer` exists, the assignment proceeds.
+
+### How It Works
+
+The semantics are straightforward:
+
+1. **Evaluate the left side** - Check if `customer` is null
+2. **If null** - Skip the entire operation (including the right side)
+3. **If not null** - Perform the assignment
+
+The key insight: **The right-hand side is only evaluated when needed.**
+
+```csharp
+customer?.Id = GenerateNextCustomerId();
+// GenerateNextCustomerId() is NOT called if customer is null
+```
+
+This is crucial for expensive operations or methods with side effects.
+
+---
+
+## Real-World Examples
+
+### 1. Optional Telemetry Logging
+
+Imagine middleware that logs telemetry, but telemetry is optional (null when disabled):
+
+**Before C# 14:**
+
+```csharp
+public async Task InvokeAsync(HttpContext context, Telemetry? telemetry)
+{
+    var start = DateTime.UtcNow;
+    await _next(context);
+
+    if (telemetry != null)
+    {
+        telemetry.RequestPath = context.Request.Path;
+        telemetry.DurationMs = (DateTime.UtcNow - start).TotalMilliseconds;
+        telemetry.StatusCode = context.Response.StatusCode;
+    }
+}
+```
+
+**With C# 14:**
+
+```csharp
+public async Task InvokeAsync(HttpContext context, Telemetry? telemetry)
+{
+    var start = DateTime.UtcNow;
+    await _next(context);
+
+    telemetry?.RequestPath = context.Request.Path;
+    telemetry?.DurationMs = (DateTime.UtcNow - start).TotalMilliseconds;
+    telemetry?.StatusCode = context.Response.StatusCode;
+}
+```
+
+Six lines down to three. The intent is crystal clear: "Log this if telemetry is enabled."
+
+### 2. Event Subscription
+
+Subscribing to events on optional components:
+
+```csharp
+// Before
+if (eventBus != null)
+    eventBus.OnDataReceived += HandleDataReceived;
+
+// After
+eventBus?.OnDataReceived += HandleDataReceived;
+```
+
+One line. No ceremony.
+
+### 3. Configuration Updates
+
+Updating deeply nested configuration objects:
+
+**Before:**
+
+```csharp
+if (appConfig != null)
+{
+    if (appConfig.UserPreferences != null)
+    {
+        appConfig.UserPreferences.Theme = "dark";
+        appConfig.UserPreferences.Language = "en-US";
+    }
+}
+```
+
+**After:**
+
+```csharp
+appConfig?.UserPreferences?.Theme = "dark";
+appConfig?.UserPreferences?.Language = "en-US";
+```
+
+Pyramid of doom? Obliterated.
+
+### 4. Collection Updates
+
+Works with indexers too:
+
+```csharp
+// Dictionary assignment
+scores?["math"] = 95;
+scores?["science"] = 88;
+
+// Array assignment
+matrix?[row, col] = CalculateValue();
+```
+
+If the collection is null, nothing happens. No `NullReferenceException`. No defensive checks.
+
+### 5. Combining with Null-Coalescing Assignment
+
+This gets really powerful when combined with `??=`:
+
+```csharp
+// Ensure config.Settings exists, but only if config is not null
+config?.Settings ??= new Settings();
+```
+
+Translation: "If config exists and its Settings property is null, create a new Settings object."
+
+Compare that to the pre-C# 14 version:
+
+```csharp
+if (config != null)
+{
+    if (config.Settings == null)
+        config.Settings = new Settings();
+}
+```
+
+One line versus four. And more readable.
+
+---
+
+## Advanced Patterns
+
+### Chained Null-Conditional Assignments
+
+You can chain multiple levels:
+
+```csharp
+company?.Department?.Manager?.Assistant = newAssistant;
+```
+
+The assignment only happens if **every part of the chain** is non-null. One null anywhere? The entire operation is skipped.
+
+### Multiple Assignments with Guards
+
+```csharp
+public void UpdateUser(User? user, string name, int age)
+{
+    user?.Name = name;
+    user?.Age = age;
+    user?.LastUpdated = DateTime.UtcNow;
+}
+```
+
+If `user` is null, all three assignments are safely skipped. If `user` exists, all three properties get updated.
+
+### Conditional Method Invocation After Assignment
+
+```csharp
+cache?.Data = FetchFromDatabase();
+cache?.Invalidate(); // Method call after assignment
+```
+
+Both operations respect the null check.
+
+---
+
+## What You Can't Do (Yet)
+
+C# 14's null-conditional assignment is powerful, but has limitations:
+
+### ❌ No Increment/Decrement Operators
+
+```csharp
+counter?.Value++; // Compiler error
+counter?.Value += 1; // Also an error
+```
+
+**Why?** These operators return a value (the incremented result). The semantics get unclear: What should be returned if the object is null?
+
+**Workaround:**
+
+```csharp
+if (counter != null)
+    counter.Value++;
+```
+
+### ❌ Not for Value Types
+
+```csharp
+int? number = 5;
+number?.Value = 10; // Doesn't make sense - int? is a value type
+```
+
+Value types have different nullability semantics. Use regular nullable operations instead.
+
+### ❌ No `ref` Assignment
+
+```csharp
+ref int target = ref array?[0]; // Not supported
+```
+
+`ref` semantics require the target to exist. Null-conditional logic conflicts with this.
+
+---
+
+## Performance Considerations
+
+**Question:** Does `?.` add overhead compared to explicit null checks?
+
+**Answer:** No meaningful difference in release builds. The JIT compiler optimizes both to similar IL code.
+
+**Benchmark comparison:**
+
+```csharp
+// Method 1: Explicit check
+if (customer != null)
+    customer.Order = order;
+
+// Method 2: Null-conditional
+customer?.Order = order;
+```
+
+Both compile to essentially the same machine code. Use `?.` for readability without worrying about performance.
+
+---
+
+## Migration Tips
+
+### Start with Non-Critical Code
+
+Begin using null-conditional assignments in logging, telemetry, or other non-critical paths:
+
+```csharp
+logger?.LogInformation("User logged in");
+metrics?.RecordLogin(userId);
+```
+
+### Replace Nested Null Checks First
+
+These see the biggest readability improvement:
+
+```csharp
+// Before: 7 lines, 3 indentation levels
+if (response != null)
+{
+    if (response.Data != null)
+    {
+        response.Data.ProcessedAt = DateTime.UtcNow;
+    }
+}
+
+// After: 1 line, 0 indentation levels
+response?.Data?.ProcessedAt = DateTime.UtcNow;
+```
+
+---
+
+## Common Pitfalls
+
+### Pitfall 1: Forgetting Side Effects
+
+```csharp
+cache?.Data = FetchExpensiveData();
+// FetchExpensiveData() is NOT called if cache is null
+```
+
+This is usually what you want, but be aware of the behavior.
+
+### Pitfall 2: Overusing in Critical Paths
+
+```csharp
+// ❌ Bad: Hides a logic error
+order?.Total = CalculateTotal();
+
+// ✅ Better: Orders should never be null here
+if (order == null)
+    throw new InvalidOperationException("Order cannot be null");
+order.Total = CalculateTotal();
+```
+
+Use `?.` for truly optional objects, not to hide bugs.
+
+---
+
+## The Bottom Line
+
+Null-conditional assignment completes C#'s null-safety story. You can now:
+
+- ✅ Read nullable properties: `var x = customer?.Order?.Date`
+- ✅ Write nullable properties: `customer?.Order = newOrder`
+- ✅ Chain multiple levels: `company?.Dept?.Manager?.Name = "Alice"`
+
+**Result:** Less boilerplate, fewer bugs, more readable code.
+
+---
+
+## Coming Up Next
+
+Next, we'll explore **Extension Members** - the ability to add properties, operators, and static members to types you don't own. Imagine adding a `.IsWeekend` property to `DateTime` or custom operators to third-party types.
+
+**Previously:** [Part 1 - The field Keyword - Simplifying Property Logic](dot-net-10-c-sharp-14-p1)
