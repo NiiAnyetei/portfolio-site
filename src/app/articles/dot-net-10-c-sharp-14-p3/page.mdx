@@ -1,0 +1,593 @@
+import { ArticleLayout } from '@/components/ArticleLayout'
+import dotNetCSharpThree from './dot-net-c-sharp-three.png'
+
+export const article = {
+  author: 'Clifford Anang',
+  date: '2026-01-27',
+  title: '.NET 10 & C# 14 Deep Dive Series - PART 3',
+  description: 'Extension Members - Add Properties & Operators to Any Type',
+}
+
+export const metadata = {
+  title: article.title,
+  description: article.description,
+}
+
+export default (props) => <ArticleLayout article={article} {...props} />
+
+<Image src={dotNetCSharpThree} alt="" />
+
+# .NET 10 & C# 14 Deep Dive Series
+
+## Part 3: Extension Members - Add Properties & Operators to Any Type
+
+_Reading time: 6 minutes_
+
+Welcome to Part 3! We've covered [field-backed properties](dot-net-10-c-sharp-14-p1) and [null-conditional assignments](dot-net-10-c-sharp-14-p2). Today's feature is a game-changer: **Extension Members**.
+
+You've used extension methods for years. Now you can extend types with **properties**, **operators**, and **static members** too.
+
+---
+
+## The Extension Methods We Know
+
+Since C# 3.0, we've had extension methods:
+
+```csharp
+public static class StringExtensions
+{
+    public static bool IsEmpty(this string str)
+        => string.IsNullOrEmpty(str);
+}
+
+// Usage
+string name = "";
+if (name.IsEmpty()) // Looks like a method on string
+    Console.WriteLine("Empty!");
+```
+
+This changed how we write C#. Suddenly, we could add behavior to types we didn't own—even sealed framework types like `string` or `DateTime`.
+
+**But there was a limitation:** Only methods. No properties, no operators, no static members.
+
+---
+
+## What You Couldn't Do (Until Now)
+
+### Problem 1: No Extension Properties
+
+You couldn't do this:
+
+```csharp
+var today = DateTime.Now;
+
+// ❌ Not possible before C# 14
+if (today.IsWeekend)
+    Console.WriteLine("Time to relax!");
+```
+
+You had to write:
+
+```csharp
+if (today.IsWeekend()) // Method call with parentheses
+    Console.WriteLine("Time to relax!");
+```
+
+Parentheses seem minor, but they break the fluent, natural feel of properties.
+
+### Problem 2: No Extension Operators
+
+Third-party libraries sometimes ship types without operator overloads:
+
+```csharp
+// Imagine a Point type from a library
+Point p1 = new Point(5, 3);
+Point p2 = new Point(2, 7);
+
+// ❌ Can't do this if Point doesn't define operator+
+Point result = p1 + p2;
+```
+
+You were stuck calling methods: `Point result = p1.Add(p2);`
+
+### Problem 3: No Static Extension Members
+
+You couldn't add static helpers to types:
+
+```csharp
+// ❌ Not possible
+var emptyList = List<int>.Empty;
+
+// Had to write
+var emptyList = new List<int>();
+```
+
+---
+
+## C# 14: Extension Members
+
+C# 14 introduces a new syntax that unlocks all of this. Instead of scattered static methods, you group extensions in a unified block:
+
+```csharp
+public static class DateTimeExtensions
+{
+    extension(DateTime date)
+    {
+        // Extension properties
+        public bool IsWeekend =>
+            date.DayOfWeek == DayOfWeek.Saturday ||
+            date.DayOfWeek == DayOfWeek.Sunday;
+
+        public bool IsWeekday => !IsWeekend;
+
+        // Extension methods
+        public DateTime NextMonday()
+        {
+            int daysUntilMonday = ((int)DayOfWeek.Monday - (int)date.DayOfWeek + 7) % 7;
+            return date.AddDays(daysUntilMonday == 0 ? 7 : daysUntilMonday);
+        }
+    }
+}
+```
+
+### Usage
+
+```csharp
+var today = DateTime.Now;
+
+Console.WriteLine(today.IsWeekend);        // Property access
+Console.WriteLine(today.IsWeekday);        // Another property
+Console.WriteLine(today.NextMonday());     // Method call
+```
+
+Notice how properties feel like first-class members of `DateTime`. No awkward method calls.
+
+---
+
+## Real-World Examples
+
+### 1. Semantic Date Properties
+
+```csharp
+public static class DateTimeExtensions
+{
+    extension(DateTime date)
+    {
+        public DateTime MondayOfCurrentWeek
+        {
+            get
+            {
+                int diff = (7 + (date.DayOfWeek - DayOfWeek.Monday)) % 7;
+                return date.Date.AddDays(-diff);
+            }
+        }
+
+        public DateTime StartOfMonth => new DateTime(date.Year, date.Month, 1);
+
+        public DateTime EndOfMonth =>
+            new DateTime(date.Year, date.Month,
+                DateTime.DaysInMonth(date.Year, date.Month));
+
+        public int DaysUntilEndOfMonth =>
+            DateTime.DaysInMonth(date.Year, date.Month) - date.Day;
+
+        public int Quarter => (date.Month - 1) / 3 + 1;
+    }
+}
+```
+
+**Usage in a report:**
+
+```csharp
+var report = new QuarterlyReport
+{
+    StartDate = DateTime.Now.MondayOfCurrentWeek,
+    EndDate = DateTime.Now.EndOfMonth,
+    Quarter = DateTime.Now.Quarter
+};
+```
+
+Reads like natural language.
+
+### 2. Collection Helpers
+
+```csharp
+public static class EnumerableExtensions
+{
+    extension<T>(IEnumerable<T> source)
+    {
+        public bool IsEmpty => !source.Any();
+
+        public bool IsNotEmpty => source.Any();
+
+        public int Count => source.Count();
+
+        public T? FirstOrDefault => source.FirstOrDefault();
+
+        public IEnumerable<T> Shuffle()
+        {
+            var random = new Random();
+            return source.OrderBy(_ => random.Next());
+        }
+
+        public IEnumerable<T> DistinctBy<TKey>(Func<T, TKey> keySelector)
+            => source.GroupBy(keySelector).Select(g => g.First());
+    }
+}
+```
+
+**Before:**
+
+```csharp
+if (!products.Any())
+    return NotFound();
+```
+
+**After:**
+
+```csharp
+if (products.IsEmpty)
+    return NotFound();
+```
+
+Cleaner, more readable.
+
+### 3. String Utilities
+
+```csharp
+public static class StringExtensions
+{
+    extension(string str)
+    {
+        public bool IsNullOrEmpty => string.IsNullOrEmpty(str);
+
+        public bool IsNullOrWhiteSpace => string.IsNullOrWhiteSpace(str);
+
+        public bool HasValue => !string.IsNullOrWhiteSpace(str);
+
+        public int WordCount =>
+            str.Split(new[] { ' ', '\t', '\n', '\r' },
+                StringSplitOptions.RemoveEmptyEntries).Length;
+
+        public string Truncate(int maxLength, string suffix = "...")
+        {
+            if (str.Length <= maxLength) return str;
+            return str.Substring(0, maxLength - suffix.Length) + suffix;
+        }
+    }
+}
+```
+
+**Usage:**
+
+```csharp
+if (description.HasValue)
+    Console.WriteLine(description.Truncate(100));
+```
+
+---
+
+## Extension Operators: The Real Power Move
+
+Here's where it gets exciting. You can add operators to types you don't own:
+
+```csharp
+public static class PointExtensions
+{
+    extension(Point p)
+    {
+        // Addition
+        public static Point operator +(Point a, Point b)
+            => new Point(a.X + b.X, a.Y + b.Y);
+
+        // Subtraction
+        public static Point operator -(Point a, Point b)
+            => new Point(a.X - b.X, a.Y - b.Y);
+
+        // Scalar multiplication
+        public static Point operator *(Point p, int scalar)
+            => new Point(p.X * scalar, p.Y * scalar);
+
+        // Division
+        public static Point operator /(Point p, int divisor)
+            => new Point(p.X / divisor, p.Y / divisor);
+
+        // Negation
+        public static Point operator -(Point p)
+            => new Point(-p.X, -p.Y);
+    }
+}
+```
+
+**Usage:**
+
+```csharp
+Point p1 = new Point(10, 5);
+Point p2 = new Point(3, 2);
+
+Point sum = p1 + p2;              // Point(13, 7)
+Point diff = p1 - p2;             // Point(7, 3)
+Point scaled = p1 * 3;            // Point(30, 15)
+Point halved = p1 / 2;            // Point(5, 2)
+Point inverted = -p1;             // Point(-10, -5)
+```
+
+Suddenly, a third-party `Point` type feels as natural as built-in numeric types.
+
+### Custom Comparison Operators
+
+```csharp
+public static class VersionExtensions
+{
+    extension(Version v)
+    {
+        public static bool operator >(Version a, Version b)
+            => a.CompareTo(b) > 0;
+
+        public static bool operator <(Version a, Version b)
+            => a.CompareTo(b) < 0;
+
+        public static bool operator >=(Version a, Version b)
+            => a.CompareTo(b) >= 0;
+
+        public static bool operator <=(Version a, Version b)
+            => a.CompareTo(b) <= 0;
+    }
+}
+```
+
+**Usage:**
+
+```csharp
+Version current = new Version(2, 5, 0);
+Version required = new Version(2, 0, 0);
+
+if (current >= required)
+    Console.WriteLine("Version check passed!");
+```
+
+---
+
+## Static Extension Members
+
+You can even add static properties and methods to types:
+
+```csharp
+public static class ListExtensions
+{
+    extension<T>(List<T>)
+    {
+        // Static property
+        public static List<T> Empty => new List<T>();
+
+        // Static method
+        public static List<T> Combine(List<T> a, List<T> b)
+            => a.Concat(b).ToList();
+
+        public static List<T> FromSingle(T item)
+            => new List<T> { item };
+    }
+}
+```
+
+**Usage:**
+
+```csharp
+var empty = List<int>.Empty;
+var combined = List<string>.Combine(list1, list2);
+var single = List<string>.FromSingle("hello");
+```
+
+Static members feel like they've always been part of the type.
+
+---
+
+## Organizing Your Extensions
+
+### Group Related Extensions
+
+```csharp
+public static class NumericExtensions
+{
+    extension(int value)
+    {
+        public bool IsEven => value % 2 == 0;
+        public bool IsOdd => value % 2 != 0;
+        public bool IsPositive => value > 0;
+        public bool IsNegative => value < 0;
+
+        public int Square() => value * value;
+        public int Cube() => value * value * value;
+    }
+
+    extension(double value)
+    {
+        public bool IsWholeNumber => Math.Abs(value % 1) < 0.0001;
+        public int RoundToInt() => (int)Math.Round(value);
+    }
+}
+```
+
+All numeric extensions in one file, organized by type.
+
+### Domain-Specific Extensions
+
+```csharp
+public static class ValidationExtensions
+{
+    extension(string str)
+    {
+        public bool IsValidEmail =>
+            Regex.IsMatch(str, @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+
+        public bool IsValidUrl =>
+            Uri.TryCreate(str, UriKind.Absolute, out _);
+
+        public bool IsNumeric =>
+            double.TryParse(str, out _);
+    }
+}
+```
+
+**Usage:**
+
+```csharp
+if (!email.IsValidEmail)
+    return BadRequest("Invalid email format");
+```
+
+---
+
+## Comparison: Old vs. New Syntax
+
+**Traditional Extension Methods:**
+
+```csharp
+public static class Extensions
+{
+    public static bool IsEmpty<T>(this IEnumerable<T> source)
+        => !source.Any();
+
+    public static bool IsNotEmpty<T>(this IEnumerable<T> source)
+        => source.Any();
+
+    public static int Count<T>(this IEnumerable<T> source)
+        => source.Count();
+}
+```
+
+**Extension Members Syntax:**
+
+```csharp
+public static class Extensions
+{
+    extension<T>(IEnumerable<T> source)
+    {
+        public bool IsEmpty => !source.Any();
+        public bool IsNotEmpty => source.Any();
+        public int Count => source.Count();
+    }
+}
+```
+
+Benefits of the new syntax:
+
+- ✅ Less repetition (one `extension` declaration)
+- ✅ Clearer grouping (all related members together)
+- ✅ Support for properties, not just methods
+- ✅ Support for operators and static members
+
+---
+
+## Important Limitations
+
+### Can't Override Existing Members
+
+```csharp
+extension(string str)
+{
+    // ❌ Error: string already has a Length property
+    public int Length => str.Length + 1;
+}
+```
+
+Extensions can only **add** members, not replace them.
+
+### Can't Access Private Members
+
+```csharp
+extension(MyClass obj)
+{
+    // ❌ Can't access private fields or methods
+    public void BreakEncapsulation() => obj._privateField = 10;
+}
+```
+
+Extensions respect encapsulation.
+
+### Compile-Time Resolution
+
+Extension members are resolved at compile time, not runtime:
+
+```csharp
+object obj = "Hello";
+// ❌ Can't call string extensions on object reference
+obj.IsEmpty; // Doesn't compile
+```
+
+You need to cast or use a typed variable.
+
+---
+
+## Migration Strategy
+
+### Start with Properties
+
+Convert method-based extensions to properties where it makes sense:
+
+```csharp
+// Before
+if (list.IsEmpty()) { ... }
+
+// After
+if (list.IsEmpty) { ... }
+```
+
+### Add Operators Gradually
+
+Don't add operators just because you can. Add them when they make code more readable:
+
+✅ **Good use case:**
+
+```csharp
+TimeSpan total = duration1 + duration2 + duration3;
+```
+
+❌ **Poor use case:**
+
+```csharp
+Customer combined = customer1 + customer2; // What does this mean?
+```
+
+### Organize by Domain
+
+Group extensions by domain, not by target type:
+
+```
+Extensions/
+  ├── Validation/
+  │   ├── StringValidationExtensions.cs
+  │   └── ObjectValidationExtensions.cs
+  ├── Collections/
+  │   ├── EnumerableExtensions.cs
+  │   └── ListExtensions.cs
+  └── DateTime/
+      └── DateTimeExtensions.cs
+```
+
+---
+
+## The Bottom Line
+
+Extension members complete the extension story in C#:
+
+- ✅ **Properties** - Natural, fluent syntax
+- ✅ **Operators** - Mathematical and logical operations on any type
+- ✅ **Static members** - Factory methods and utilities
+- ✅ **Better organization** - Group related extensions together
+
+This isn't just syntactic sugar. It fundamentally changes how you can shape the API surface of types you don't control.
+
+---
+
+## Series Recap
+
+We've now covered the three major C# 14 features:
+
+1. **[Part 1: Field-Backed Properties](dot-net-10-c-sharp-14-p1)** - Eliminate property boilerplate
+2. **[Part 2: Null-Conditional Assignment](dot-net-10-c-sharp-14-p2)** - Stop writing null checks
+3. **Part 3: Extension Members** (you are here) - Extend any type with properties and operators
+
+## Coming Up Next
+
+We'll shift from language features to runtime improvements. Expect deep dives into JIT compiler enhancements, stack allocation optimizations, and performance benchmarks that'll make you want to upgrade immediately.
