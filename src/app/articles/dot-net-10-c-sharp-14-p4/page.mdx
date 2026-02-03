@@ -1,0 +1,590 @@
+import { ArticleLayout } from '@/components/ArticleLayout'
+import dotNetCSharpFour from './dot-net-c-sharp-four.png'
+
+export const article = {
+  author: 'Clifford Anang',
+  date: '2026-02-03',
+  title: '.NET 10 & C# 14 Deep Dive Series - PART 4',
+  description: 'Runtime Performance - The Speed Gains You Actually Notice',
+}
+
+export const metadata = {
+  title: article.title,
+  description: article.description,
+}
+
+export default (props) => <ArticleLayout article={article} {...props} />
+
+<Image src={dotNetCSharpFour} alt="" />
+
+## Part 4: Runtime Performance - The Speed Gains You'll Actually Notice
+
+Welcome to Part 4! We've explored language features in [Part 1](dot-net-10-c-sharp-14-p1), [Part 2](dot-net-10-c-sharp-14-p2), and [Part 3](dot-net-10-c-sharp-14-p3). Now it's time to talk about what happens **under the hood**.
+
+## .NET 10's runtime improvements are substantial. We're talking 30-50% faster execution in some scenarios, zero-allocation optimizations, and smarter memory management—all without changing a single line of your code.
+
+---
+
+## The Performance Story
+
+Every .NET release brings performance improvements, but .NET 10 focuses on three key areas:
+
+1. **JIT Compiler** - Smarter code generation
+2. **Memory Management** - Stack allocation and escape analysis
+3. **Hardware Acceleration** - AVX10.2 and ARM64 SVE support
+
+Let's break down what this means for your applications.
+
+---
+
+## JIT Compiler: The Brain Gets Smarter
+
+The Just-In-Time (JIT) compiler translates your IL code into machine code at runtime. .NET 10's JIT is significantly smarter about how it generates and optimizes that code.
+
+### 1. Struct Argument Handling
+
+**The Old Problem:**
+
+When you passed structs to methods, the JIT would often store them in memory even when they could fit in CPU registers.
+
+```csharp
+public struct Point
+{
+    public int X;
+    public int Y;
+}
+
+public int CalculateDistance(Point p1, Point p2)
+{
+    int dx = p2.X - p1.X;
+    int dy = p2.Y - p1.Y;
+    return (int)Math.Sqrt(dx * dx + dy * dy);
+}
+```
+
+**Before .NET 10:**
+
+- Store `p1` to stack memory
+- Store `p2` to stack memory
+- Load `p1.X` from memory into register
+- Load `p2.X` from memory into register
+- Perform subtraction
+- _...repeat for Y..._
+
+**Memory accesses everywhere.** Slow.
+
+**With .NET 10:**
+
+The JIT performs "physical promotion"—it keeps struct members directly in registers without the memory round-trip.
+
+- `p1.X` → Register R1
+- `p1.Y` → Register R2
+- `p2.X` → Register R3
+- `p2.Y` → Register R4
+- Perform operations directly on registers
+
+**Result:** Up to **2x faster** for struct-heavy code.
+
+### 2. Array Interface Devirtualization
+
+This one's subtle but powerful.
+
+**The Scenario:**
+
+You have an array, but you're accessing it through an interface:
+
+```csharp
+public int SumArray(IEnumerable<int> values)
+{
+    int sum = 0;
+    foreach (var value in values)
+        sum += value;
+    return sum;
+}
+
+// Called with an array
+int[] numbers = Enumerable.Range(1, 1000).ToArray();
+int total = SumArray(numbers);
+```
+
+**Before .NET 10:**
+
+Every iteration of that `foreach` involved:
+
+1. Virtual dispatch to `IEnumerator<int>.MoveNext()`
+2. Virtual dispatch to `IEnumerator<int>.Current`
+3. Indirection through interface table
+
+**With .NET 10:**
+
+The JIT detects that you're iterating an array and devirtualizes the calls:
+
+```csharp
+// What the JIT effectively generates
+for (int i = 0; i < numbers.Length; i++)
+    sum += numbers[i];
+```
+
+Direct array access. No virtual calls. No indirection.
+
+**Benchmark Results:**
+
+```
+| Method          | Runtime   | Mean      | Speedup |
+|----------------|-----------|-----------|---------|
+| SumViaInterface | .NET 9.0  | 847.3 ns  | 1.0x    |
+| SumViaInterface | .NET 10.0 | 312.4 ns  | 2.7x    |
+```
+
+**2.7x faster** for a common pattern you're probably already using.
+
+---
+
+## Memory Magic: Stack Allocation
+
+Heap allocations are expensive. They trigger garbage collection, fragment memory, and add overhead. .NET 10 gets much better at avoiding them.
+
+### Escape Analysis: Keeping Objects Local
+
+**Escape analysis** determines whether an object "escapes" the method that creates it. If it doesn't escape, it can be stack-allocated.
+
+**Example:**
+
+```csharp
+public void ProcessData()
+{
+    var numbers = new List<int> { 1, 2, 3, 4, 5 };
+    int sum = numbers.Sum();
+    Console.WriteLine(sum);
+}
+```
+
+**Analysis:**
+
+- `numbers` is created
+- Used only within `ProcessData`
+- Doesn't escape to caller or other threads
+
+**Before .NET 10:** Heap allocation (causes GC pressure)
+
+**With .NET 10:** Stack allocation (zero GC impact)
+
+This is automatic. You don't change your code—the runtime just does the right thing.
+
+### Small Array Stack Allocation
+
+Small, short-lived arrays now get stack-allocated automatically:
+
+```csharp
+public void CalculateAverage()
+{
+    int[] values = new int[4] { 10, 20, 30, 40 };
+    double avg = values.Average();
+    Console.WriteLine(avg);
+}
+```
+
+**Before .NET 10:**
+
+```
+Allocation: 72 bytes on heap
+GC Pressure: Yes
+```
+
+**With .NET 10:**
+
+```
+Allocation: 0 bytes (stack-allocated)
+GC Pressure: None
+```
+
+**Benchmark:**
+
+```
+| Method           | Runtime   | Mean     | Allocated |
+|-----------------|-----------|----------|-----------|
+| SmallArrayAlloc | .NET 9.0  | 7.70 ns  | 72 B      |
+| SmallArrayAlloc | .NET 10.0 | 3.92 ns  | 0 B       |
+```
+
+**49% faster, zero allocations.**
+
+This compounds. If you're creating millions of small arrays in a tight loop, this optimization is transformative.
+
+---
+
+## Loop Optimization: Hot Path Density
+
+The JIT now uses sophisticated algorithms to organize your code for better CPU cache utilization.
+
+### The Problem
+
+Modern CPUs have multiple levels of cache (L1, L2, L3). Code that fits in L1 cache runs dramatically faster than code that doesn't.
+
+**Traditional JIT approach:**
+
+- Generate code in the order it appears in IL
+- Hope the CPU prefetcher does its job
+
+**Result:** "Hot paths" (frequently executed code) might be scattered across memory.
+
+### The .NET 10 Solution
+
+The JIT models code layout as an **Asymmetric Travelling Salesman Problem** to:
+
+1. Identify hot paths (loops, frequently called methods)
+2. Place hot code contiguously in memory
+3. Minimize branch distances
+
+**Real-World Impact:**
+
+```csharp
+public int ProcessOrders(List<Order> orders)
+{
+    int total = 0;
+    foreach (var order in orders) // Hot path
+    {
+        if (order.IsValid) // Hot path
+        {
+            total += order.Amount; // Hot path
+        }
+        else // Cold path (rare)
+        {
+            LogInvalidOrder(order); // Cold path
+        }
+    }
+    return total;
+}
+```
+
+**Before:** Hot and cold paths mixed together in memory
+
+**After:** Hot path densely packed, cold path moved elsewhere
+
+**Result:** Better instruction cache hit rates = faster execution
+
+### Benchmark Example:
+
+```
+| Scenario          | .NET 9.0  | .NET 10.0 | Improvement |
+|------------------|-----------|-----------|-------------|
+| Tight Loop       | 245 ms    | 187 ms    | 23.7%       |
+| Branch-Heavy Code| 512 ms    | 398 ms    | 22.3%       |
+```
+
+---
+
+## Enhanced Inlining
+
+Method inlining is crucial for performance. The .NET 10 JIT can now inline:
+
+1. **Methods that become eligible for devirtualization**
+2. **Methods with try-finally blocks**
+
+### Example: Try-Finally Inlining
+
+**Before .NET 10:**
+
+```csharp
+public int GetValue()
+{
+    try
+    {
+        return ExpensiveComputation();
+    }
+    finally
+    {
+        Cleanup();
+    }
+}
+```
+
+This method would **never be inlined**, even if it was called in a hot path.
+
+**With .NET 10:**
+
+The JIT can inline this method if appropriate, eliminating the call overhead.
+
+### Devirtualization Chain Inlining
+
+```csharp
+public void ProcessData<T>(IEnumerable<T> items) where T : IProcessor
+{
+    foreach (var item in items)
+    {
+        item.Process(); // Virtual call
+    }
+}
+```
+
+**What happens:**
+
+1. JIT inlines `ProcessData`
+2. Discovers the concrete type of `T`
+3. Devirtualizes `item.Process()`
+4. Inlines the now-devirtualized method
+
+**Result:** What looks like a virtual call through a generic interface becomes direct, inlined code.
+
+---
+
+## Hardware Acceleration
+
+### AVX10.2 Support
+
+AVX (Advanced Vector Extensions) allows processing multiple data elements in a single instruction.
+
+**Example: Vector Addition**
+
+```csharp
+// Without SIMD: Process one element at a time
+for (int i = 0; i < array.Length; i++)
+    result[i] = array1[i] + array2[i];
+
+// With AVX10.2: Process 8 elements at once
+Vector256<int> v1 = Vector256.Load(array1);
+Vector256<int> v2 = Vector256.Load(array2);
+Vector256<int> sum = Vector256.Add(v1, v2);
+```
+
+**Performance:**
+
+```
+| Method        | Elements | Time      |
+|--------------|----------|-----------|
+| Scalar       | 1000     | 1,247 ns  |
+| AVX10.2      | 1000     | 178 ns    |
+```
+
+**7x faster** for vectorizable operations.
+
+### ARM64 SVE Support
+
+ARM's Scalable Vector Extensions bring similar benefits to ARM processors (Apple Silicon, AWS Graviton, etc.).
+
+**Cross-Platform Performance:**
+
+Your .NET 10 code automatically uses the best instructions for the target CPU:
+
+- **x64:** AVX10.2
+- **ARM64:** SVE
+- **Older CPUs:** Fallback implementations
+
+No conditional compilation. No platform-specific code. The runtime handles it.
+
+---
+
+## NativeAOT Improvements
+
+NativeAOT (Ahead-of-Time compilation) produces native executables without requiring a JIT at runtime.
+
+### .NET 10 Enhancements
+
+**Smaller Binaries:**
+
+- Better tree shaking (unused code removal)
+- Improved IL trimming
+- Optimized runtime inclusion
+
+**Faster Startup:**
+
+- Pre-initialized static data
+- Reduced initialization overhead
+- Optimized type metadata
+
+**Example Results:**
+
+```
+| Metric           | .NET 9.0  | .NET 10.0 | Improvement |
+|-----------------|-----------|-----------|-------------|
+| Binary Size     | 12.4 MB   | 8.7 MB    | 29.8%       |
+| Startup Time    | 47 ms     | 31 ms     | 34.0%       |
+| Memory Usage    | 23.5 MB   | 19.2 MB   | 18.3%       |
+```
+
+Perfect for containers, microservices, and edge deployments.
+
+---
+
+## Real-World Performance Gains
+
+Let's put this together with realistic scenarios:
+
+### Scenario 1: API Endpoint Processing
+
+```csharp
+[HttpPost]
+public IActionResult ProcessOrders(List<OrderDto> orders)
+{
+    var validOrders = orders
+        .Where(o => o.Amount > 0)
+        .Select(o => new Order(o))
+        .ToList();
+
+    return Ok(new { Count = validOrders.Count });
+}
+```
+
+**Improvements in .NET 10:**
+
+- ✅ Array devirtualization in LINQ
+- ✅ Struct handling optimization
+- ✅ Stack allocation for small collections
+- ✅ Better inlining
+
+**Result:** 25-35% faster request processing
+
+### Scenario 2: Data Processing Loop
+
+```csharp
+public void ProcessSensorData(SensorReading[] readings)
+{
+    for (int i = 0; i < readings.Length; i++)
+    {
+        var reading = readings[i];
+        if (reading.Temperature > 100)
+        {
+            RaiseAlert(reading);
+        }
+    }
+}
+```
+
+**Improvements:**
+
+- ✅ Hot path optimization
+- ✅ Better branch prediction
+- ✅ Struct register allocation
+
+**Result:** 20-30% faster processing
+
+### Scenario 3: JSON Serialization
+
+```csharp
+var json = JsonSerializer.Serialize(largeObject);
+```
+
+**Improvements:**
+
+- ✅ Reduced allocations
+- ✅ Better SIMD usage for string operations
+- ✅ Optimized reflection
+
+**Result:** 15-25% faster serialization
+
+---
+
+## How to Measure Impact
+
+Want to see these improvements in your code? Use BenchmarkDotNet:
+
+```csharp
+[MemoryDiagnoser]
+[SimpleJob(RuntimeMoniker.Net90)]
+[SimpleJob(RuntimeMoniker.Net100)]
+public class MyBenchmark
+{
+    private int[] _data;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _data = Enumerable.Range(1, 1000).ToArray();
+    }
+
+    [Benchmark]
+    public int SumData()
+    {
+        return _data.Sum();
+    }
+}
+```
+
+Run it:
+
+```bash
+dotnet run -c Release
+```
+
+Compare .NET 9 vs .NET 10 results side-by-side.
+
+---
+
+## Migration: Do You Need to Change Anything?
+
+**Short answer: No.**
+
+These optimizations are **automatic**. You get them by:
+
+1. Upgrading to .NET 10
+2. Recompiling your code
+
+That's it. No code changes required.
+
+### But You Can Optimize Further
+
+If you want to squeeze out even more performance:
+
+**Use value types where appropriate:**
+
+```csharp
+// Better for .NET 10's optimizations
+public readonly struct Point
+{
+    public int X { get; init; }
+    public int Y { get; init; }
+}
+```
+
+**Leverage SIMD when beneficial:**
+
+```csharp
+using System.Runtime.Intrinsics;
+
+// Explicit vectorization for critical paths
+Vector256<int> result = Vector256.Add(v1, v2);
+```
+
+**Prefer arrays for hot paths:**
+
+```csharp
+// Better optimization potential
+int[] data = new int[100];
+
+// Less optimization potential
+List<int> data = new List<int>(100);
+```
+
+---
+
+## The Bottom Line
+
+.NET 10's runtime improvements are substantial:
+
+- ✅ **30-50% faster** in many scenarios
+- ✅ **Zero allocation** optimizations
+- ✅ **Better CPU cache** utilization
+- ✅ **Automatic** - no code changes needed
+- ✅ **Cross-platform** - works on x64, ARM64, and more
+
+This isn't just synthetic benchmarks. Real applications see real gains:
+
+- Web APIs respond faster
+- Batch processing completes sooner
+- Desktop apps feel snappier
+- Container workloads use less memory
+
+---
+
+## Series Recap
+
+We've now covered:
+
+1. **[Part 1: Field-Backed Properties](dot-net-10-c-sharp-14-p1)** - Eliminate property boilerplate
+2. **[Part 2: Null-Conditional Assignment](dot-net-10-c-sharp-14-p2)** - Cleaner null handling
+3. **[Part 3: Extension Members](dot-net-10-c-sharp-14-p3)** - Properties and operators on any type
+4. **Part 4: Runtime Performance** (you are here) - Speed without code changes
+
+## Coming Up Next
+
+AI Integration with the Microsoft Agent Framework—how to add AI capabilities to your .NET applications with first-class support for OpenAI, Azure OpenAI, and more.

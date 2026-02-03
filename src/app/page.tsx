@@ -187,7 +187,7 @@ function Resume() {
   let resume: Array<Role> = [
     {
       company: 'Accede',
-      title: 'Full stack .NET Engineer',
+      title: 'Full stack Engineer',
       logo: logoAccede,
       start: '2020',
       end: {
