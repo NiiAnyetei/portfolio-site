@@ -1,0 +1,760 @@
+import { ArticleLayout } from '@/components/ArticleLayout'
+import dotNetCSharpFive from './dot-net-c-sharp-five.png'
+
+export const article = {
+  author: 'Clifford Anang',
+  date: '2026-02-10',
+  title: '.NET 10 & C# 14 Deep Dive Series - PART 5',
+  description: 'AI Integration - Built-In Intelligence for Your Apps',
+}
+
+export const metadata = {
+  title: article.title,
+  description: article.description,
+}
+
+export default (props) => <ArticleLayout article={article} {...props} />
+
+<Image src={dotNetCSharpFive} alt="" />
+
+## Part 5: AI Integration - Built-In Intelligence for Your Apps
+
+Welcome to Part 5! We've covered language features ([Part 1](dot-net-10-c-sharp-14-p1), [Part 2](dot-net-10-c-sharp-14-p2), [Part 3](dot-net-10-c-sharp-14-p3)) and runtime improvements ([Part 4](dot-net-10-c-sharp-14-p4)). Today, we're exploring something entirely new: **first-class AI support** built directly into .NET.
+
+.NET 10 introduces the **Microsoft Agent Framework** and **Microsoft.Extensions.AI**, making it easier than ever to add intelligent features to your applications.
+
+---
+
+## The AI Integration Problem
+
+Before .NET 10, adding AI to your app meant:
+
+1. **Multiple SDKs** - Different packages for OpenAI, Azure OpenAI, Anthropic, etc.
+2. **Inconsistent APIs** - Each provider has different interfaces
+3. **No Abstractions** - Switching providers means rewriting code
+4. **Manual Plumbing** - You handle retries, rate limits, and error handling
+
+**Example (Pre-.NET 10):**
+
+```csharp
+// OpenAI-specific code
+using OpenAI;
+
+var client = new OpenAIClient("your-api-key");
+var response = await client.Completions.CreateAsync(new CompletionRequest
+{
+    Prompt = "What is the weather?",
+    Model = "gpt-4",
+    MaxTokens = 100
+});
+```
+
+Want to switch to Azure OpenAI? Completely different API. Want to try Anthropic's Claude? Different again.
+
+---
+
+## Enter Microsoft.Extensions.AI
+
+.NET 10 introduces a unified abstraction layer for AI services, similar to how `ILogger` works for logging.
+
+### The Core Interface: IChatClient
+
+```csharp
+public interface IChatClient
+{
+    Task<ChatCompletion> CompleteAsync(
+        IList<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    IAsyncEnumerable<StreamingChatCompletionUpdate> CompleteStreamingAsync(
+        IList<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default);
+}
+```
+
+One interface. Multiple providers. Write once, run anywhere.
+
+---
+
+## Getting Started: Your First AI-Powered App
+
+### Step 1: Install the Package
+
+```bash
+dotnet add package Microsoft.Extensions.AI
+dotnet add package Microsoft.Extensions.AI.OpenAI
+```
+
+### Step 2: Basic Chat Completion
+
+```csharp
+using Microsoft.Extensions.AI;
+
+// Create a chat client (OpenAI example)
+IChatClient client = new OpenAIChatClient(
+    model: "gpt-4",
+    apiKey: Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
+
+// Send a message
+var response = await client.CompleteAsync("What is the capital of France?");
+
+Console.WriteLine(response.Message.Text);
+// Output: "The capital of France is Paris."
+```
+
+That's it. Clean, simple, and abstracted.
+
+### Step 3: Conversation History
+
+```csharp
+var messages = new List<ChatMessage>
+{
+    new(ChatRole.System, "You are a helpful coding assistant."),
+    new(ChatRole.User, "How do I reverse a string in C#?")
+};
+
+var response = await client.CompleteAsync(messages);
+Console.WriteLine(response.Message.Text);
+
+// Continue the conversation
+messages.Add(response.Message);
+messages.Add(new ChatMessage(ChatRole.User, "Can you show me a LINQ example?"));
+
+response = await client.CompleteAsync(messages);
+Console.WriteLine(response.Message.Text);
+```
+
+The client maintains no state—you manage the conversation history.
+
+---
+
+## Streaming Responses
+
+For real-time applications (chatbots, live assistants), use streaming:
+
+```csharp
+await foreach (var update in client.CompleteStreamingAsync(
+    "Write a short story about a robot learning to paint."))
+{
+    Console.Write(update.Text);
+}
+```
+
+**Output appears word-by-word:**
+
+```
+Once upon a time... there was a robot... named Artie... who discovered...
+```
+
+Perfect for responsive UIs where you want to show progress.
+
+---
+
+## Dependency Injection Integration
+
+.NET 10 makes AI a first-class citizen in the DI container:
+
+```csharp
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// Register the chat client
+builder.Services.AddChatClient(services =>
+    new OpenAIChatClient(
+        model: "gpt-4",
+        apiKey: builder.Configuration["OpenAI:ApiKey"]));
+
+var app = builder.Build();
+
+// Use it in your services
+public class CustomerSupportService
+{
+    private readonly IChatClient _chatClient;
+
+    public CustomerSupportService(IChatClient chatClient)
+    {
+        _chatClient = chatClient;
+    }
+
+    public async Task<string> GetSupportResponse(string userQuestion)
+    {
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, "You are a customer support agent."),
+            new(ChatRole.User, userQuestion)
+        };
+
+        var response = await _chatClient.CompleteAsync(messages);
+        return response.Message.Text;
+    }
+}
+```
+
+Now you can inject `IChatClient` anywhere in your application.
+
+---
+
+## Multi-Provider Support
+
+The beauty of `IChatClient` is provider independence. Switch providers without changing business logic:
+
+### OpenAI
+
+```csharp
+builder.Services.AddChatClient(services =>
+    new OpenAIChatClient("gpt-4", apiKey));
+```
+
+### Azure OpenAI
+
+```csharp
+builder.Services.AddChatClient(services =>
+    new AzureOpenAIChatClient(
+        endpoint: new Uri("https://your-resource.openai.azure.com/"),
+        credential: new AzureKeyCredential(apiKey),
+        deploymentName: "gpt-4"));
+```
+
+### Ollama (Local Models)
+
+```csharp
+builder.Services.AddChatClient(services =>
+    new OllamaChatClient(
+        endpoint: new Uri("http://localhost:11434"),
+        modelId: "llama2"));
+```
+
+### GitHub Models
+
+```csharp
+builder.Services.AddChatClient(services =>
+    new GitHubChatClient(
+        modelId: "gpt-4o",
+        token: githubToken));
+```
+
+**Same code. Different providers.** Just swap the registration.
+
+---
+
+## Advanced Features
+
+### Caching Responses
+
+```csharp
+builder.Services.AddChatClient(services =>
+{
+    var innerClient = new OpenAIChatClient("gpt-4", apiKey);
+    return new CachingChatClient(innerClient, services.GetRequiredService<IDistributedCache>());
+});
+```
+
+Identical prompts? Served from cache. Saves costs and latency.
+
+### Rate Limiting
+
+```csharp
+builder.Services.AddChatClient(services =>
+{
+    var innerClient = new OpenAIChatClient("gpt-4", apiKey);
+    return new RateLimitingChatClient(
+        innerClient,
+        maxRequestsPerMinute: 60);
+});
+```
+
+Automatic backoff and retry on rate limit errors.
+
+### Logging and Telemetry
+
+```csharp
+builder.Services.AddChatClient(services =>
+{
+    var innerClient = new OpenAIChatClient("gpt-4", apiKey);
+    var logger = services.GetRequiredService<ILogger<LoggingChatClient>>();
+    return new LoggingChatClient(innerClient, logger);
+});
+```
+
+Every request/response logged automatically.
+
+### Chaining Middleware
+
+Combine multiple behaviors using the decorator pattern:
+
+```csharp
+builder.Services.AddChatClient(services =>
+{
+    IChatClient client = new OpenAIChatClient("gpt-4", apiKey);
+
+    // Add logging
+    client = new LoggingChatClient(client, services.GetRequiredService<ILogger>());
+
+    // Add caching
+    client = new CachingChatClient(client, services.GetRequiredService<IDistributedCache>());
+
+    // Add rate limiting
+    client = new RateLimitingChatClient(client, maxRequestsPerMinute: 60);
+
+    return client;
+});
+```
+
+The order matters—logging happens first, then cache checks, then rate limiting.
+
+---
+
+## Real-World Use Cases
+
+### 1. Smart Document Summarization
+
+```csharp
+public class DocumentService
+{
+    private readonly IChatClient _chatClient;
+
+    public DocumentService(IChatClient chatClient)
+    {
+        _chatClient = chatClient;
+    }
+
+    public async Task<string> SummarizeDocument(string documentText)
+    {
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, "You are a document summarization expert. Provide concise summaries."),
+            new(ChatRole.User, $"Summarize this document:\n\n{documentText}")
+        };
+
+        var response = await _chatClient.CompleteAsync(messages);
+        return response.Message.Text;
+    }
+}
+```
+
+**Usage:**
+
+```csharp
+var summary = await documentService.SummarizeDocument(longReport);
+Console.WriteLine(summary);
+```
+
+### 2. Intelligent Search Enhancement
+
+```csharp
+public class SearchService
+{
+    private readonly IChatClient _chatClient;
+    private readonly IProductRepository _productRepo;
+
+    public SearchService(IChatClient chatClient, IProductRepository productRepo)
+    {
+        _chatClient = chatClient;
+        _productRepo = productRepo;
+    }
+
+    public async Task<List<Product>> SmartSearch(string naturalLanguageQuery)
+    {
+        // Convert natural language to structured search
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System,
+                "Convert user queries to JSON with: category, priceRange, features. Example: {\"category\":\"laptops\",\"priceRange\":{\"min\":500,\"max\":1000}}"),
+            new(ChatRole.User, naturalLanguageQuery)
+        };
+
+        var response = await _chatClient.CompleteAsync(messages);
+        var searchCriteria = JsonSerializer.Deserialize<SearchCriteria>(response.Message.Text);
+
+        return await _productRepo.Search(searchCriteria);
+    }
+}
+```
+
+**Usage:**
+
+```csharp
+// Natural language input
+var results = await searchService.SmartSearch(
+    "Show me affordable laptops under $1000 with good battery life");
+```
+
+### 3. Code Review Assistant
+
+````csharp
+public class CodeReviewService
+{
+    private readonly IChatClient _chatClient;
+
+    public async Task<CodeReviewResult> ReviewCode(string code, string language)
+    {
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System,
+                $"You are a senior {language} developer. Review code for bugs, performance issues, and best practices."),
+            new(ChatRole.User, $"Review this code:\n\n```{language}\n{code}\n```")
+        };
+
+        var response = await _chatClient.CompleteAsync(messages);
+
+        return new CodeReviewResult
+        {
+            Feedback = response.Message.Text,
+            Timestamp = DateTime.UtcNow
+        };
+    }
+}
+````
+
+### 4. Customer Support Chatbot
+
+```csharp
+public class ChatbotService
+{
+    private readonly IChatClient _chatClient;
+    private readonly Dictionary<string, List<ChatMessage>> _conversations = new();
+
+    public async Task<string> Chat(string userId, string message)
+    {
+        // Get or create conversation history
+        if (!_conversations.ContainsKey(userId))
+        {
+            _conversations[userId] = new List<ChatMessage>
+            {
+                new(ChatRole.System,
+                    "You are a friendly customer support agent. Be helpful and concise.")
+            };
+        }
+
+        var conversation = _conversations[userId];
+        conversation.Add(new ChatMessage(ChatRole.User, message));
+
+        // Get AI response
+        var response = await _chatClient.CompleteAsync(conversation);
+        conversation.Add(response.Message);
+
+        return response.Message.Text;
+    }
+}
+```
+
+**Usage in ASP.NET Core:**
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+public class ChatController : ControllerBase
+{
+    private readonly ChatbotService _chatbot;
+
+    public ChatController(ChatbotService chatbot)
+    {
+        _chatbot = chatbot;
+    }
+
+    [HttpPost("message")]
+    public async Task<IActionResult> SendMessage([FromBody] ChatRequest request)
+    {
+        var response = await _chatbot.Chat(request.UserId, request.Message);
+        return Ok(new { response });
+    }
+}
+```
+
+---
+
+## Model Context Protocol (MCP)
+
+.NET 10 introduces first-class support for the **Model Context Protocol**—a standardized way for AI agents to access external data sources and tools.
+
+### What is MCP?
+
+MCP allows AI models to securely interact with:
+
+- **Databases** (SQL, MongoDB, etc.)
+- **APIs** (REST, GraphQL)
+- **File Systems**
+- **External Services** (Google Drive, Slack, etc.)
+
+Think of it as a plugin system for AI agents.
+
+### Creating an MCP Server
+
+```bash
+dotnet new mcpserver -n WeatherMcpServer
+```
+
+**Implementation:**
+
+```csharp
+using Microsoft.Extensions.AI.ModelContextProtocol;
+
+public class WeatherMcpServer : McpServer
+{
+    [Tool("get_weather")]
+    public async Task<string> GetWeather(string city)
+    {
+        // Call weather API
+        var weatherData = await _weatherApi.GetCurrentWeather(city);
+        return $"The weather in {city} is {weatherData.Condition} with temperature {weatherData.Temperature}°F";
+    }
+
+    [Tool("get_forecast")]
+    public async Task<string> GetForecast(string city, int days)
+    {
+        var forecast = await _weatherApi.GetForecast(city, days);
+        return JsonSerializer.Serialize(forecast);
+    }
+}
+```
+
+### Using MCP with Chat Clients
+
+```csharp
+var chatClient = new OpenAIChatClient("gpt-4", apiKey);
+
+// Register MCP tools
+chatClient.RegisterMcpServer(new WeatherMcpServer());
+
+var messages = new List<ChatMessage>
+{
+    new(ChatRole.User, "What's the weather like in Paris for the next 3 days?")
+};
+
+// The AI can now call your MCP tools
+var response = await chatClient.CompleteAsync(messages);
+```
+
+The AI model automatically:
+
+1. Recognizes it needs weather data
+2. Calls your `GetForecast` tool
+3. Incorporates the results into its response
+
+### Publishing MCP Servers
+
+MCP servers can be published as NuGet packages:
+
+```bash
+dotnet pack
+dotnet nuget push WeatherMcpServer.1.0.0.nupkg
+```
+
+Other developers can install and use your tools:
+
+```bash
+dotnet add package WeatherMcpServer
+```
+
+---
+
+## Configuration Best Practices
+
+### Secure API Keys
+
+```csharp
+// appsettings.json
+{
+  "AI": {
+    "Provider": "OpenAI",
+    "ApiKey": "sk-...",
+    "Model": "gpt-4",
+    "MaxTokens": 1000
+  }
+}
+```
+
+**Use Azure Key Vault in production:**
+
+```csharp
+builder.Configuration.AddAzureKeyVault(
+    new Uri("https://your-vault.vault.azure.net/"),
+    new DefaultAzureCredential());
+```
+
+### Environment-Specific Providers
+
+```csharp
+builder.Services.AddChatClient(services =>
+{
+    var config = services.GetRequiredService<IConfiguration>();
+    var environment = services.GetRequiredService<IHostEnvironment>();
+
+    if (environment.IsDevelopment())
+    {
+        // Use local Ollama for development
+        return new OllamaChatClient(
+            endpoint: new Uri("http://localhost:11434"),
+            modelId: "llama2");
+    }
+    else
+    {
+        // Use Azure OpenAI for production
+        return new AzureOpenAIChatClient(
+            endpoint: new Uri(config["AI:Endpoint"]),
+            credential: new AzureKeyCredential(config["AI:ApiKey"]),
+            deploymentName: config["AI:Model"]);
+    }
+});
+```
+
+### Cost Control
+
+```csharp
+builder.Services.AddChatClient(services =>
+{
+    var client = new OpenAIChatClient("gpt-4", apiKey);
+
+    return new CostTrackingChatClient(client, new CostTrackingOptions
+    {
+        MaxDailyCost = 100.00m,
+        AlertThreshold = 80.00m,
+        OnThresholdExceeded = async (cost) =>
+        {
+            await SendAlertEmail($"AI costs reached ${cost}");
+        }
+    });
+});
+```
+
+---
+
+## Testing AI-Powered Features
+
+### Mock Chat Client for Tests
+
+```csharp
+public class MockChatClient : IChatClient
+{
+    private readonly Queue<string> _responses;
+
+    public MockChatClient(params string[] responses)
+    {
+        _responses = new Queue<string>(responses);
+    }
+
+    public Task<ChatCompletion> CompleteAsync(
+        IList<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = _responses.Dequeue();
+        return Task.FromResult(new ChatCompletion(
+            new ChatMessage(ChatRole.Assistant, response)));
+    }
+
+    public IAsyncEnumerable<StreamingChatCompletionUpdate> CompleteStreamingAsync(
+        IList<ChatMessage> messages,
+        ChatOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
+    }
+}
+```
+
+**Usage in unit tests:**
+
+```csharp
+[Fact]
+public async Task SummarizeDocument_ReturnsExpectedSummary()
+{
+    // Arrange
+    var mockClient = new MockChatClient("This is a test summary.");
+    var service = new DocumentService(mockClient);
+
+    // Act
+    var result = await service.SummarizeDocument("Long document text...");
+
+    // Assert
+    Assert.Equal("This is a test summary.", result);
+}
+```
+
+---
+
+## Performance Considerations
+
+### Token Limits
+
+```csharp
+var options = new ChatOptions
+{
+    MaxOutputTokens = 500,
+    Temperature = 0.7f
+};
+
+var response = await client.CompleteAsync(messages, options);
+```
+
+### Parallel Requests
+
+```csharp
+var tasks = documents.Select(doc =>
+    documentService.SummarizeDocument(doc));
+
+var summaries = await Task.WhenAll(tasks);
+```
+
+Be mindful of rate limits when making parallel requests.
+
+### Response Caching
+
+Cache expensive operations:
+
+```csharp
+private readonly IMemoryCache _cache;
+
+public async Task<string> GetCachedResponse(string prompt)
+{
+    var cacheKey = $"ai_response_{prompt.GetHashCode()}";
+
+    if (_cache.TryGetValue(cacheKey, out string cachedResponse))
+        return cachedResponse;
+
+    var response = await _chatClient.CompleteAsync(prompt);
+
+    _cache.Set(cacheKey, response.Message.Text, TimeSpan.FromHours(24));
+
+    return response.Message.Text;
+}
+```
+
+---
+
+## The Bottom Line
+
+.NET 10's AI integration is transformative:
+
+✅ **Unified Interface** - One API for all AI providers
+✅ **Dependency Injection** - First-class framework support
+✅ **Middleware Pipeline** - Composable behaviors (caching, logging, rate limiting)
+✅ **MCP Support** - Extend AI with custom tools and data sources
+✅ **Production Ready** - Built for enterprise scenarios
+
+You can now add intelligent features to your apps with minimal complexity:
+
+- Smart search
+- Document summarization
+- Code review assistants
+- Customer support chatbots
+- Natural language interfaces
+
+---
+
+## Series Recap
+
+We've covered the complete .NET 10 and C# 14 story:
+
+1. **[Part 1: Field-Backed Properties](dot-net-10-c-sharp-14-p1)** - Simplify property validation
+2. **[Part 2: Null-Conditional Assignment](dot-net-10-c-sharp-14-p2)** - Cleaner null handling
+3. **[Part 3: Extension Members](dot-net-10-c-sharp-14-p3)** - Add properties and operators to any type
+4. **[Part 4: Runtime Performance](dot-net-10-c-sharp-14-p4)** - Automatic speed improvements
+5. **Part 5: AI Integration** (you are here) - Built-in intelligence
+
+Want to share your use cases? Drop them on **[LinkedIn](https://www.linkedin.com/in/clifford-anang-06393b1a5/)** or **[X](https://x.com/NiiAnyetei1)**!
